@@ -1,0 +1,65 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/productdb}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    defer-datasource-initialization: true
+  
+  sql:
+    init:
+      mode: always
+  
+  flyway:
+    enabled: false
+  
+  h2:
+    console:
+      enabled: false
+  
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 60000
+  
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000
+
+logging:
+  level:
+    root: WARN
+    com.tp: INFO
+    org.springframework.security: INFO
+
+management:
+  endpoint:
+    health:
+      show-details: never
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+
+server:
+  error:
+    include-message: never
+    include-stacktrace: never
+
+app:
+  cache:
+    enabled: true
