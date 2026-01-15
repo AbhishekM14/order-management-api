@@ -8,13 +8,13 @@ INSERT INTO users (username, email, password, role) VALUES
 
 -- Insert sample products
 INSERT INTO products (name, description, price, quantity) VALUES
-('Laptop Pro 15', 'High-performance laptop with 16GB RAM', 1299.99, 50),
-('Wireless Mouse', 'Ergonomic wireless mouse', 29.99, 200),
-('Mechanical Keyboard', 'RGB mechanical gaming keyboard', 89.99, 150),
-('4K Monitor', '27-inch 4K UHD monitor', 399.99, 75),
-('USB-C Hub', '7-in-1 USB-C hub adapter', 49.99, 300),
-('Webcam HD', '1080p HD webcam with mic', 79.99, 100),
-('Desk Lamp', 'LED desk lamp with touch control', 34.99, 180),
-('Phone Stand', 'Adjustable aluminum phone stand', 19.99, 250),
-('Laptop Bag', 'Waterproof laptop backpack', 59.99, 120),
-('Power Bank', '20000mAh portable charger', 39.99, 200);
+('realme t3 ultra', 'High quality camera with 6.5-inch display'', 129.99, 50),
+('samsung s24', 'High quality camera with gorilla glass', 29.99, 200),
+('samsung s24 ultra', 'High quality hd camera with 6.5-inch display', 89.99, 150),
+('vivo t4', '16 gb ram with 256 gb rom', 399.99, 75),
+('oppo k3', 'High quality camera with gorilla display', 49.99, 300),
+('redmi note 7', 'with HDR display', 79.99, 100),
+('redmi note 8', 'with 500 mah battery', 34.99, 180),
+('iphone 16 pro', 'High quality hd camera with 6.5-inch display', 19.99, 250),
+('iphone 17', 'High quality hd camera with 6.5-inch display', 159.99, 120),
+('iphone 17 pro max', 'High quality hd camera with 6.5-inch display', 239.99, 200);
