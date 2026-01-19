@@ -21,7 +21,7 @@ class DiscountCalculatorTest {
         strategies.put("premiumUserDiscountStrategy", new PremiumUserDiscountStrategy());
         strategies.put("largeOrderDiscountStrategy", new LargeOrderDiscountStrategy());
         
-        discountCalculator = new DiscountCalculator(strategies);
+        discountCalculator = new DiscountCalculator();
     }
     
     @Test
