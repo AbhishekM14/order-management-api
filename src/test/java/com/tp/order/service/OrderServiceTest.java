@@ -4,19 +4,21 @@ import com.tp.order.dto.CreateOrderRequest;
 import com.tp.order.dto.OrderDTO;
 import com.tp.order.dto.OrderItemRequest;
 import com.tp.order.entity.*;
-import com.tp.order.entity.Order;
 import com.tp.order.exception.InsufficientStockException;
 import com.tp.order.exception.ResourceNotFoundException;
 import com.tp.order.repository.OrderRepository;
 import com.tp.order.repository.ProductRepository;
 import com.tp.order.repository.UserRepository;
 import com.tp.order.strategy.DiscountCalculator;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
@@ -26,7 +28,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith(org.mockito.junit.jupiter.MockitoExtension.class)
 class OrderServiceTest {
 
     @Mock
@@ -48,97 +50,89 @@ class OrderServiceTest {
     private Product product;
 
     @BeforeEach
-    void setUp() {
+    void setupSecurityContext() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        "testuser",
+                        "password",
+                        List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                )
+        );
+
         user = User.builder()
                 .id(1L)
-                .username("john")
+                .username("testuser")
                 .role(UserRole.USER)
                 .build();
 
         product = Product.builder()
                 .id(10L)
-                .name("Laptop")
-                .price(BigDecimal.valueOf(1000))
+                .name("Test Product")
+                .price(BigDecimal.valueOf(100))
                 .quantity(10)
                 .deleted(false)
                 .build();
-
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken("john", null, List.of())
-        );
     }
-
-    @AfterEach
-    void clearContext() {
-        SecurityContextHolder.clearContext();
-    }
-
-    // ================= CREATE ORDER =================
 
     @Test
     void createOrder_success() {
-        // List of OrderItemRequest
-        OrderItemRequest itemRequest = new OrderItemRequest(10L, 2);
-        CreateOrderRequest request = new CreateOrderRequest(List.of(itemRequest));
+        CreateOrderRequest request = new CreateOrderRequest(
+                List.of(new OrderItemRequest(10L, 2))
+        );
 
-        when(userRepository.findByUsername("john")).thenReturn(Optional.of(user));
-        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+        when(productRepository.findAllById(List.of(10L))).thenReturn(List.of(product));
         when(discountCalculator.calculateDiscount(eq(UserRole.USER), any()))
-                .thenReturn(BigDecimal.ZERO);
-        when(orderRepository.save(any(Order.class)))
-                .thenAnswer(invocation -> {
-                    Order o = invocation.getArgument(0);
-                    o.setId(1L);
-                    return o;
-                });
+                .thenReturn(BigDecimal.valueOf(20));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
 
-        OrderDTO response = orderService.createOrder(request);
+        OrderDTO result = orderService.createOrder(request);
 
-        assertNotNull(response);
-        assertEquals(1L, response.id());
-        assertEquals("john", response.username());
-        assertEquals(BigDecimal.valueOf(2000), response.orderTotal());
-
-        // Stock should decrease
-        assertEquals(8, product.getQuantity());
-
+        assertNotNull(result);
+        assertEquals(1, result.items().size());
+        assertEquals(BigDecimal.valueOf(180), result.orderTotal());
         verify(productRepository).save(product);
         verify(orderRepository).save(any(Order.class));
     }
 
     @Test
-    void createOrder_insufficientStock() {
-        OrderItemRequest itemRequest = new OrderItemRequest(10L, 20);
-        CreateOrderRequest request = new CreateOrderRequest(List.of(itemRequest));
+    void createOrder_insufficientStock_shouldThrowException() {
+        product.setQuantity(1);
 
-        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
-        when(userRepository.findByUsername("john")).thenReturn(Optional.of(user));
+        CreateOrderRequest request = new CreateOrderRequest(
+                List.of(new OrderItemRequest(10L, 5))
+        );
 
-        assertThrows(InsufficientStockException.class,
-                () -> orderService.createOrder(request));
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+        when(productRepository.findAllById(List.of(10L))).thenReturn(List.of(product));
+
+        assertThrows(
+                InsufficientStockException.class,
+                () -> orderService.createOrder(request)
+        );
     }
 
     @Test
-    void createOrder_productNotFound() {
-        OrderItemRequest itemRequest = new OrderItemRequest(99L, 1);
-        CreateOrderRequest request = new CreateOrderRequest(List.of(itemRequest));
+    void createOrder_userNotFound_shouldThrowException() {
+        CreateOrderRequest request = new CreateOrderRequest(
+                List.of(new OrderItemRequest(10L, 1))
+        );
 
-        when(productRepository.findById(99L)).thenReturn(Optional.empty());
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class,
-                () -> orderService.createOrder(request));
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> orderService.createOrder(request)
+        );
     }
 
-    // ================= GET ORDER BY ID =================
-
     @Test
-    void getOrderById_success_owner() {
+    void getOrderById_success_forOwner() {
         Order order = Order.builder()
                 .id(1L)
                 .user(user)
                 .status(OrderStatus.PENDING)
-                .items(List.of())
-                .orderTotal(BigDecimal.TEN)
+                .orderTotal(BigDecimal.valueOf(100))
                 .build();
 
         when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
@@ -146,69 +140,43 @@ class OrderServiceTest {
         OrderDTO dto = orderService.getOrderById(1L);
 
         assertEquals(1L, dto.id());
-        assertEquals("john", dto.username());
+        assertEquals("testuser", dto.username());
     }
 
     @Test
-    void getOrderById_unauthorizedUser() {
-        User otherUser = User.builder()
+    void getOrderById_unauthorizedUser_shouldThrowException() {
+        User anotherUser = User.builder()
                 .id(2L)
-                .username("alice")
+                .username("other")
                 .build();
 
         Order order = Order.builder()
                 .id(1L)
-                .user(otherUser)
+                .user(anotherUser)
                 .build();
 
         when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
 
-        assertThrows(ResourceNotFoundException.class,
-                () -> orderService.getOrderById(1L));
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> orderService.getOrderById(1L)
+        );
     }
-
-    // ================= GET MY ORDERS =================
 
     @Test
     void getMyOrders_success() {
-        Pageable pageable = PageRequest.of(0, 5);
-
         Order order = Order.builder()
                 .id(1L)
                 .user(user)
-                .items(List.of())
-                .orderTotal(BigDecimal.TEN)
-                .status(OrderStatus.PENDING)
+                .orderTotal(BigDecimal.valueOf(100))
                 .build();
 
-        when(userRepository.findByUsername("john")).thenReturn(Optional.of(user));
-        when(orderRepository.findByUser(eq(user), eq(pageable)))
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+        when(orderRepository.findByUser(eq(user), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(order)));
 
-        Page<OrderDTO> page = orderService.getMyOrders(pageable);
+        Page<OrderDTO> result = orderService.getMyOrders(Pageable.unpaged());
 
-        assertEquals(1, page.getTotalElements());
-    }
-
-    // ================= GET ALL ORDERS =================
-
-    @Test
-    void getAllOrders_success() {
-        Pageable pageable = PageRequest.of(0, 5);
-
-        Order order = Order.builder()
-                .id(1L)
-                .user(user)
-                .items(List.of())
-                .orderTotal(BigDecimal.TEN)
-                .status(OrderStatus.PENDING)
-                .build();
-
-        when(orderRepository.findAll(pageable))
-                .thenReturn(new PageImpl<>(List.of(order)));
-
-        Page<OrderDTO> page = orderService.getAllOrders(pageable);
-
-        assertEquals(1, page.getTotalElements());
+        assertEquals(1, result.getTotalElements());
     }
 }

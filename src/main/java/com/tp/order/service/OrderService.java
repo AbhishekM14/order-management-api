@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import com.tp.order.dto.CreateOrderRequest;
 import com.tp.order.dto.OrderDTO;
 import com.tp.order.dto.OrderItemDTO;
+import com.tp.order.dto.OrderItemRequest;
 import com.tp.order.entity.*;
 import com.tp.order.exception.InsufficientStockException;
 import com.tp.order.exception.ResourceNotFoundException;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,54 +52,48 @@ public class OrderService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
         
-        // Validate stock availability for all items
-        validateStock(request);
-        
-        // Create order
-        Order order = Order.builder()
-                .user(user)
-                .status(OrderStatus.PENDING)
-                .items(new ArrayList<>())
-                .build();
+        Order order = Order.builder().user(user).status(OrderStatus.PENDING).build();
         
         BigDecimal subtotal = BigDecimal.ZERO;
+        List<Long> productIds=request.items().stream().map(OrderItemRequest::productId).toList();
+        List<Product> products = productRepository.findAllById(productIds);
+        checkProductAvailability(products, request.items());
         
         // Process each order item
         for (var itemRequest : request.items()) {
-            Product product = productRepository.findById(itemRequest.productId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + itemRequest.productId()));
             
-            BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(itemRequest.quantity()));
-            subtotal = subtotal.add(itemTotal);
-            
-            OrderItem orderItem = OrderItem.builder()
-                    .product(product)
-                    .quantity(itemRequest.quantity())
-                    .unitPrice(product.getPrice())
-                    .discountApplied(BigDecimal.ZERO)
-                    .totalPrice(itemTotal)
-                    .build();
-            
-            order.addItem(orderItem);
+        	Product product = products.stream().filter(p -> p.getId().equals(itemRequest.productId())).findFirst()
+					.get();
+			BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(itemRequest.quantity()));
+			subtotal = subtotal.add(itemTotal);
+
+			OrderItem orderItem = OrderItem.builder().product(product).quantity(itemRequest.quantity())
+					.unitPrice(product.getPrice()).discountApplied(BigDecimal.ZERO).totalPrice(itemTotal).build();
+
+			order.addItem(orderItem);
             
             // Decrease product stock
             product.setQuantity(product.getQuantity() - itemRequest.quantity());
             productRepository.save(product);
         }
         
-        
+        log.info("Initial Order Total = " + subtotal);
         BigDecimal totalDiscount = discountCalculator.calculateDiscount(user.getRole(), subtotal);
+        log.info("totalDiscount = " + totalDiscount);
         BigDecimal orderTotal = subtotal.subtract(totalDiscount);
-        
+        log.info("orderTotal  = " + orderTotal);
         
         if (totalDiscount.compareTo(BigDecimal.ZERO) > 0) {
             for (OrderItem item : order.getItems()) {
-                BigDecimal itemDiscount = totalDiscount
-                        .multiply(item.getTotalPrice())
-                        .divide(subtotal, 2, BigDecimal.ROUND_HALF_UP);
-                
-                item.setDiscountApplied(itemDiscount);
-                item.setTotalPrice(item.getTotalPrice().subtract(itemDiscount));
+            	log.info("Order Product id = " + item.getProduct().getId() + " totalDiscount  = " + totalDiscount);
+
+				BigDecimal itemDiscount = totalDiscount.multiply(item.getTotalPrice()).divide(subtotal, 2,
+						RoundingMode.HALF_UP);
+
+				log.info("Item Total Amount = " + item.getTotalPrice() + "itemDiscount  = " + itemDiscount);
+
+				item.setDiscountApplied(itemDiscount);
+				item.setTotalPrice(item.getTotalPrice().subtract(itemDiscount));
             }
         }
         
@@ -148,24 +144,21 @@ public class OrderService {
                 .map(this::mapToDTO);
     }
     
-    private void validateStock(CreateOrderRequest request) {
-        for (var itemRequest : request.items()) {
-            Product product = productRepository.findById(itemRequest.productId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + itemRequest.productId()));
-            
-            if (product.getDeleted()) {
-                throw new ResourceNotFoundException("Product not found with id: " + itemRequest.productId());
-            }
-            
-            if (product.getQuantity() < itemRequest.quantity()) {
-                throw new InsufficientStockException(
-                        "Insufficient stock for given product: " + product.getName() +
-                        ". Available: " + product.getQuantity() + 
-                        ", Requested: " + itemRequest.quantity()
-                );
-            }
-        }
-    }
+    private void checkProductAvailability(List<Product> products, List<OrderItemRequest> orderItems) {
+		for (OrderItemRequest item : orderItems) {
+			Product product = products.stream().filter(p -> p.getId().equals(item.productId())).findFirst()
+					.orElseThrow(() -> new InsufficientStockException("Product not found: " + item.productId()));
+
+			if (product.getDeleted()) {
+				throw new InsufficientStockException(String.valueOf(product.getId()));
+			}
+
+			if (product.getQuantity() < item.quantity() && product.getDeleted()) {
+				throw new InsufficientStockException(String.valueOf(item.quantity()));
+			}
+		}
+	}
+
     
     private OrderDTO mapToDTO(Order order) {
         List<OrderItemDTO> itemDTOs = order.getItems().stream()

@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 @RequiredArgsConstructor
 public class DiscountCalculator {
 
-	private final CompositeDiscountStrategy discountStrategy = new CompositeDiscountStrategy();
+	private final CompositeDiscountStrategy discountStrategy;
 
 	public BigDecimal calculateDiscount(UserRole userRole, BigDecimal orderTotal) {
 		return discountStrategy.calculateDiscount(userRole, orderTotal);

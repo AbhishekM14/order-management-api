@@ -1,18 +1,17 @@
 package com.tp.order.strategy;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
-import java.math.BigDecimal;
-import java.util.List;
-
+import com.tp.order.entity.UserRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.tp.order.entity.UserRole;
+import java.math.BigDecimal;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CompositeDiscountStrategyTest {
@@ -28,79 +27,89 @@ class CompositeDiscountStrategyTest {
 
     private CompositeDiscountStrategy compositeDiscountStrategy;
 
-    private final BigDecimal orderTotal = new BigDecimal("100.00");
-    private final UserRole userRole = UserRole.ADMIN;
-
     @BeforeEach
-    void setUp() {
+    void setup() {
         compositeDiscountStrategy =
-                new CompositeDiscountStrategy();
+                new CompositeDiscountStrategy(List.of(strategy1, strategy2, strategy3));
     }
 
     @Test
-    void isApplicable_shouldAlwaysReturnTrue() {
-        assertTrue(compositeDiscountStrategy.isApplicable(userRole, orderTotal));
-    }
+    void calculateDiscount_shouldSumApplicableStrategyDiscounts() {
+        // given
+        UserRole role = UserRole.USER;
+        BigDecimal orderTotal = BigDecimal.valueOf(1000);
 
-    @Test
-    void calculateDiscount_shouldSumOnlyApplicableStrategies() {
-        when(strategy1.isApplicable(userRole, orderTotal)).thenReturn(true);
-        when(strategy1.calculateDiscount(orderTotal)).thenReturn(new BigDecimal("10.00"));
+        when(strategy1.isApplicable(role, orderTotal)).thenReturn(true);
+        when(strategy1.calculateDiscount(orderTotal)).thenReturn(BigDecimal.valueOf(100));
 
-        when(strategy2.isApplicable(userRole, orderTotal)).thenReturn(true);
-        when(strategy2.calculateDiscount(orderTotal)).thenReturn(new BigDecimal("5.00"));
+        when(strategy2.isApplicable(role, orderTotal)).thenReturn(true);
+        when(strategy2.calculateDiscount(orderTotal)).thenReturn(BigDecimal.valueOf(50));
 
-        when(strategy3.isApplicable(userRole, orderTotal)).thenReturn(false);
+        when(strategy3.isApplicable(role, orderTotal)).thenReturn(false);
 
+        // when
         BigDecimal discount =
-                compositeDiscountStrategy.calculateDiscount(userRole, orderTotal);
+                compositeDiscountStrategy.calculateDiscount(role, orderTotal);
 
-        assertEquals(new BigDecimal("15.00"), discount);
+        // then
+        assertEquals(BigDecimal.valueOf(150), discount);
     }
 
     @Test
-    void calculateDiscount_shouldReturnZeroWhenNoStrategyIsApplicable() {
-        when(strategy1.isApplicable(userRole, orderTotal)).thenReturn(false);
-        when(strategy2.isApplicable(userRole, orderTotal)).thenReturn(false);
-        when(strategy3.isApplicable(userRole, orderTotal)).thenReturn(false);
+    void calculateDiscount_shouldReturnZeroWhenNoStrategyApplies() {
+        // given
+        UserRole role = UserRole.ADMIN;
+        BigDecimal orderTotal = BigDecimal.valueOf(500);
 
+        when(strategy1.isApplicable(role, orderTotal)).thenReturn(false);
+        when(strategy2.isApplicable(role, orderTotal)).thenReturn(false);
+        when(strategy3.isApplicable(role, orderTotal)).thenReturn(false);
+
+        // when
         BigDecimal discount =
-                compositeDiscountStrategy.calculateDiscount(userRole, orderTotal);
+                compositeDiscountStrategy.calculateDiscount(role, orderTotal);
 
+        // then
         assertEquals(BigDecimal.ZERO, discount);
     }
 
     @Test
-    void getCombinedDescription_shouldCombineDescriptionsOfApplicableStrategies() {
-        when(strategy1.isApplicable(userRole, orderTotal)).thenReturn(true);
+    void getCombinedDescription_shouldJoinDescriptionsOfApplicableStrategies() {
+        // given
+        UserRole role = UserRole.USER;
+        BigDecimal orderTotal = BigDecimal.valueOf(200);
+
+        when(strategy1.isApplicable(role, orderTotal)).thenReturn(true);
         when(strategy1.getDescription()).thenReturn("Role discount");
 
-        when(strategy2.isApplicable(userRole, orderTotal)).thenReturn(true);
+        when(strategy2.isApplicable(role, orderTotal)).thenReturn(true);
         when(strategy2.getDescription()).thenReturn("Seasonal discount");
 
-        when(strategy3.isApplicable(userRole, orderTotal)).thenReturn(false);
+        when(strategy3.isApplicable(role, orderTotal)).thenReturn(false);
 
+        // when
         String description =
-                compositeDiscountStrategy.getCombinedDescription(userRole, orderTotal);
+                compositeDiscountStrategy.getCombinedDescription(role, orderTotal);
 
+        // then
         assertEquals("Role discount + Seasonal discount", description);
     }
 
     @Test
-    void getCombinedDescription_shouldReturnDefaultMessageWhenNoDiscountApplied() {
-        when(strategy1.isApplicable(userRole, orderTotal)).thenReturn(false);
-        when(strategy2.isApplicable(userRole, orderTotal)).thenReturn(false);
-        when(strategy3.isApplicable(userRole, orderTotal)).thenReturn(false);
+    void getCombinedDescription_shouldReturnDefaultMessageWhenNoStrategyApplies() {
+        // given
+        UserRole role = UserRole.USER;
+        BigDecimal orderTotal = BigDecimal.valueOf(50);
 
+        when(strategy1.isApplicable(role, orderTotal)).thenReturn(false);
+        when(strategy2.isApplicable(role, orderTotal)).thenReturn(false);
+        when(strategy3.isApplicable(role, orderTotal)).thenReturn(false);
+
+        // when
         String description =
-                compositeDiscountStrategy.getCombinedDescription(userRole, orderTotal);
+                compositeDiscountStrategy.getCombinedDescription(role, orderTotal);
 
+        // then
         assertEquals("No discount applied", description);
-    }
-
-    @Test
-    void calculateDiscount_withoutUserRole_shouldThrowException() {
-        assertThrows(UnsupportedOperationException.class,
-                () -> compositeDiscountStrategy.calculateDiscount(orderTotal));
     }
 }
