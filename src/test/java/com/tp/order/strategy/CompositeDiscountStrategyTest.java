@@ -1,115 +1,111 @@
 package com.tp.order.strategy;
 
-import com.tp.order.entity.UserRole;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.*;
+
+import java.math.BigDecimal;
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.when;
+import com.tp.order.entity.UserRole;
 
 @ExtendWith(MockitoExtension.class)
 class CompositeDiscountStrategyTest {
 
-    @Mock
-    private DiscountStrategy strategy1;
+	@Mock
+	private DiscountStrategy strategy1;
 
-    @Mock
-    private DiscountStrategy strategy2;
+	@Mock
+	private DiscountStrategy strategy2;
 
-    @Mock
-    private DiscountStrategy strategy3;
+	private CompositeDiscountStrategy compositeStrategy;
 
-    private CompositeDiscountStrategy compositeDiscountStrategy;
+	@BeforeEach
+	void setUp() {
+		compositeStrategy = new CompositeDiscountStrategy(
+				List.of(strategy1, strategy2)
+		);
+	}
 
-    @BeforeEach
-    void setup() {
-        compositeDiscountStrategy =
-                new CompositeDiscountStrategy(List.of(strategy1, strategy2, strategy3));
-    }
+	@Test
+	void shouldSumDiscountsFromApplicableStrategies() {
+		BigDecimal orderTotal = new BigDecimal("1000.00");
 
-    @Test
-    void calculateDiscount_shouldSumApplicableStrategyDiscounts() {
-        // given
-        UserRole role = UserRole.USER;
-        BigDecimal orderTotal = BigDecimal.valueOf(1000);
+		when(strategy1.isApplicable(UserRole.PREMIUM_USER, orderTotal)).thenReturn(true);
+		when(strategy2.isApplicable(UserRole.PREMIUM_USER, orderTotal)).thenReturn(true);
 
-        when(strategy1.isApplicable(role, orderTotal)).thenReturn(true);
-        when(strategy1.calculateDiscount(orderTotal)).thenReturn(BigDecimal.valueOf(100));
+		when(strategy1.calculateDiscount(orderTotal)).thenReturn(new BigDecimal("50.00"));
+		when(strategy2.calculateDiscount(orderTotal)).thenReturn(new BigDecimal("100.00"));
 
-        when(strategy2.isApplicable(role, orderTotal)).thenReturn(true);
-        when(strategy2.calculateDiscount(orderTotal)).thenReturn(BigDecimal.valueOf(50));
+		BigDecimal discount = compositeStrategy.calculateDiscount(
+				UserRole.PREMIUM_USER, orderTotal);
 
-        when(strategy3.isApplicable(role, orderTotal)).thenReturn(false);
+		assertEquals(new BigDecimal("150.00"), discount);
+	}
 
-        // when
-        BigDecimal discount =
-                compositeDiscountStrategy.calculateDiscount(role, orderTotal);
+	@Test
+	void shouldReturnZeroWhenNoStrategyIsApplicable() {
+		BigDecimal orderTotal = new BigDecimal("500.00");
 
-        // then
-        assertEquals(BigDecimal.valueOf(150), discount);
-    }
+		when(strategy1.isApplicable(any(), any())).thenReturn(false);
+		when(strategy2.isApplicable(any(), any())).thenReturn(false);
 
-    @Test
-    void calculateDiscount_shouldReturnZeroWhenNoStrategyApplies() {
-        // given
-        UserRole role = UserRole.ADMIN;
-        BigDecimal orderTotal = BigDecimal.valueOf(500);
+		BigDecimal discount = compositeStrategy.calculateDiscount(
+				UserRole.USER, orderTotal);
 
-        when(strategy1.isApplicable(role, orderTotal)).thenReturn(false);
-        when(strategy2.isApplicable(role, orderTotal)).thenReturn(false);
-        when(strategy3.isApplicable(role, orderTotal)).thenReturn(false);
+		assertEquals(BigDecimal.ZERO, discount);
+	}
 
-        // when
-        BigDecimal discount =
-                compositeDiscountStrategy.calculateDiscount(role, orderTotal);
+	@Test
+	void shouldReturnZeroWhenOrderTotalIsNull() {
+		BigDecimal discount = compositeStrategy.calculateDiscount(
+				UserRole.PREMIUM_USER, null);
 
-        // then
-        assertEquals(BigDecimal.ZERO, discount);
-    }
+		assertEquals(BigDecimal.ZERO, discount);
+	}
 
-    @Test
-    void getCombinedDescription_shouldJoinDescriptionsOfApplicableStrategies() {
-        // given
-        UserRole role = UserRole.USER;
-        BigDecimal orderTotal = BigDecimal.valueOf(200);
+	@Test
+	void shouldReturnZeroWhenOrderTotalIsZeroOrNegative() {
+		BigDecimal discount = compositeStrategy.calculateDiscount(
+				UserRole.PREMIUM_USER, BigDecimal.ZERO);
 
-        when(strategy1.isApplicable(role, orderTotal)).thenReturn(true);
-        when(strategy1.getDescription()).thenReturn("Role discount");
+		assertEquals(BigDecimal.ZERO, discount);
+	}
 
-        when(strategy2.isApplicable(role, orderTotal)).thenReturn(true);
-        when(strategy2.getDescription()).thenReturn("Seasonal discount");
+	@Test
+	void shouldCombineDescriptionsCorrectly() {
+		BigDecimal orderTotal = new BigDecimal("800.00");
 
-        when(strategy3.isApplicable(role, orderTotal)).thenReturn(false);
+		when(strategy1.isApplicable(UserRole.PREMIUM_USER, orderTotal)).thenReturn(true);
+		when(strategy2.isApplicable(UserRole.PREMIUM_USER, orderTotal)).thenReturn(true);
 
-        // when
-        String description =
-                compositeDiscountStrategy.getCombinedDescription(role, orderTotal);
+		when(strategy1.getDescription()).thenReturn("5% large order discount");
+		when(strategy2.getDescription()).thenReturn("10% premium user discount");
 
-        // then
-        assertEquals("Role discount + Seasonal discount", description);
-    }
+		String description = compositeStrategy.getCombinedDescription(
+				UserRole.PREMIUM_USER, orderTotal);
 
-    @Test
-    void getCombinedDescription_shouldReturnDefaultMessageWhenNoStrategyApplies() {
-        // given
-        UserRole role = UserRole.USER;
-        BigDecimal orderTotal = BigDecimal.valueOf(50);
+		assertEquals(
+				"5% large order discount + 10% premium user discount",
+				description
+		);
+	}
 
-        when(strategy1.isApplicable(role, orderTotal)).thenReturn(false);
-        when(strategy2.isApplicable(role, orderTotal)).thenReturn(false);
-        when(strategy3.isApplicable(role, orderTotal)).thenReturn(false);
+	@Test
+	void shouldReturnDefaultDescriptionWhenNoDiscountApplied() {
+		BigDecimal orderTotal = new BigDecimal("200.00");
 
-        // when
-        String description =
-                compositeDiscountStrategy.getCombinedDescription(role, orderTotal);
+		when(strategy1.isApplicable(any(), any())).thenReturn(false);
+		when(strategy2.isApplicable(any(), any())).thenReturn(false);
 
-        // then
-        assertEquals("No discount applied", description);
-    }
+		String description = compositeStrategy.getCombinedDescription(
+				UserRole.USER, orderTotal);
+
+		assertEquals("No discount applied", description);
+	}
 }

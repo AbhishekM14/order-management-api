@@ -11,61 +11,72 @@ import com.tp.order.entity.UserRole;
 
 class PremiumUserDiscountStrategyTest {
 
-    private PremiumUserDiscountStrategy strategy;
+	private PremiumUserDiscountStrategy strategy;
 
-    @BeforeEach
-    void setUp() {
-        strategy = new PremiumUserDiscountStrategy();
-    }
+	@BeforeEach
+	void setUp() {
+		strategy = new PremiumUserDiscountStrategy();
+	}
 
-    @Test
-    void isApplicable_shouldReturnTrue_forPremiumUser() {
-        BigDecimal orderTotal = new BigDecimal("200.00");
+	@Test
+	void isApplicable_shouldReturnTrue_forPremiumUser() {
+		BigDecimal orderTotal = new BigDecimal("200.00");
 
-        boolean applicable = strategy.isApplicable(UserRole.PREMIUM_USER, orderTotal);
+		boolean applicable = strategy.isApplicable(UserRole.PREMIUM_USER, orderTotal);
 
-        assertTrue(applicable);
-    }
+		assertTrue(applicable);
+	}
 
-    @Test
-    void isApplicable_shouldReturnFalse_forNonPremiumUser() {
-        BigDecimal orderTotal = new BigDecimal("200.00");
+	@Test
+	void isApplicable_shouldReturnFalse_forNonPremiumUser() {
+		BigDecimal orderTotal = new BigDecimal("200.00");
 
-        boolean applicable = strategy.isApplicable(UserRole.PREMIUM_USER, orderTotal);
+		boolean applicable = strategy.isApplicable(UserRole.USER, orderTotal);
 
-        assertFalse(applicable);
-    }
+		assertFalse(applicable);
+	}
 
-    @Test
-    void calculateDiscount_shouldReturnTenPercentOfOrderTotal() {
-        BigDecimal orderTotal = new BigDecimal("200.00");
+	@Test
+	void calculateDiscount_shouldReturnTenPercentOfOrderTotal() {
+		BigDecimal orderTotal = new BigDecimal("200.00");
 
-        BigDecimal discount = strategy.calculateDiscount(orderTotal);
+		BigDecimal discount = strategy.calculateDiscount(orderTotal);
 
-        assertEquals(new BigDecimal("20.00"), discount);
-    }
+		assertEquals(new BigDecimal("20.00"), discount);
+	}
 
-    @Test
-    void calculateDiscount_shouldRoundToTwoDecimalPlaces() {
-        BigDecimal orderTotal = new BigDecimal("333.33");
+	@Test
+	void calculateDiscount_shouldRoundToTwoDecimalPlaces() {
+		BigDecimal orderTotal = new BigDecimal("333.33");
 
-        BigDecimal discount = strategy.calculateDiscount(orderTotal);
+		BigDecimal discount = strategy.calculateDiscount(orderTotal);
 
-        // 333.33 * 0.10 = 33.333 → 33.33 (HALF_UP)
-        assertEquals(new BigDecimal("33.33"), discount);
-    }
+		// 333.33 × 0.10 = 33.333 → 33.33 (HALF_UP)
+		assertEquals(new BigDecimal("33.33"), discount);
+	}
 
-    @Test
-    void calculateDiscount_shouldReturnZero_whenOrderTotalIsZero() {
-        BigDecimal orderTotal = BigDecimal.ZERO;
+	@Test
+	void calculateDiscount_shouldReturnZero_whenOrderTotalIsZero() {
+		BigDecimal orderTotal = BigDecimal.ZERO;
 
-        BigDecimal discount = strategy.calculateDiscount(orderTotal);
+		BigDecimal discount = strategy.calculateDiscount(orderTotal);
 
-        assertEquals(BigDecimal.ZERO.setScale(2), discount);
-    }
+		assertEquals(new BigDecimal("0.00"), discount);
+	}
 
-    @Test
-    void getDescription_shouldReturnCorrectDescription() {
-        assertEquals("10% premium user discount", strategy.getDescription());
-    }
+	@Test
+	void calculateDiscount_shouldThrowException_whenOrderTotalIsNull() {
+		assertThrows(
+				NullPointerException.class,
+				() -> strategy.calculateDiscount(null)
+		);
+	}
+
+	@Test
+	void getDescription_shouldReturnCorrectDescription() {
+		assertEquals(
+				"10% discount for premium users",
+				strategy.getDescription()
+		);
+	}
 }

@@ -6,6 +6,7 @@ import com.tp.order.entity.UserRole;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Objects;
 
 @Component("largeOrderDiscountStrategy")
 public class LargeOrderDiscountStrategy implements DiscountStrategy {
@@ -15,15 +16,15 @@ public class LargeOrderDiscountStrategy implements DiscountStrategy {
 
 	@Override
 	public boolean isApplicable(UserRole userRole, BigDecimal orderTotal) {
-		return orderTotal.compareTo(THRESHOLD) > 0;
+		return Objects.nonNull(orderTotal)
+				&& orderTotal.compareTo(THRESHOLD) > 0;
 	}
 
 	@Override
 	public BigDecimal calculateDiscount(BigDecimal orderTotal) {
-		if (orderTotal.compareTo(THRESHOLD) > 0) {
-			return orderTotal.multiply(LARGE_ORDER_DISCOUNT_RATE).setScale(2, RoundingMode.HALF_UP);
-		}
-		return BigDecimal.ZERO;
+
+		return orderTotal.multiply(LARGE_ORDER_DISCOUNT_RATE).setScale(2, RoundingMode.HALF_UP);
+
 	}
 
 	@Override

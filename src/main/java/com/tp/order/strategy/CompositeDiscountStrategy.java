@@ -1,8 +1,8 @@
 package com.tp.order.strategy;
 
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.stereotype.Component;
 
@@ -18,27 +18,39 @@ public class CompositeDiscountStrategy implements DiscountStrategy {
 
 	@Override
 	public boolean isApplicable(UserRole userRole, BigDecimal orderTotal) {
-		return true; // composite is always applicable
+		// Composite itself is always applicable
+		return true;
 	}
 
 	@Override
 	public BigDecimal calculateDiscount(BigDecimal orderTotal) {
-		throw new UnsupportedOperationException("Use calculateDiscount(UserRole, BigDecimal)");
+		throw new UnsupportedOperationException(
+				"Use calculateDiscount(UserRole, BigDecimal) for composite discount calculation");
 	}
 
 	public BigDecimal calculateDiscount(UserRole userRole, BigDecimal orderTotal) {
-		return strategies.stream().filter(s -> s.isApplicable(userRole, orderTotal))
-				.map(s -> s.calculateDiscount(orderTotal)).reduce(BigDecimal.ZERO, BigDecimal::add);
+		if (Objects.isNull(orderTotal) || orderTotal.compareTo(BigDecimal.ZERO) <= 0) {
+			return BigDecimal.ZERO;
+		}
+
+		return strategies.stream()
+				.filter(strategy -> strategy != this)
+				.filter(strategy -> strategy.isApplicable(userRole, orderTotal))
+				.map(strategy -> strategy.calculateDiscount(orderTotal))
+				.reduce(BigDecimal.ZERO, BigDecimal::add);
 	}
 
 	public String getCombinedDescription(UserRole userRole, BigDecimal orderTotal) {
-		return strategies.stream().filter(s -> s.isApplicable(userRole, orderTotal))
-				.map(DiscountStrategy::getDescription).reduce((a, b) -> a + " + " + b).orElse("No discount applied");
+		return strategies.stream()
+				.filter(strategy -> strategy != this)
+				.filter(strategy -> strategy.isApplicable(userRole, orderTotal))
+				.map(DiscountStrategy::getDescription)
+				.reduce((a, b) -> a + " + " + b)
+				.orElse("No discount applied");
 	}
 
 	@Override
 	public String getDescription() {
 		return "Composite discount";
 	}
-
 }

@@ -6,6 +6,7 @@ import com.tp.order.entity.UserRole;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Objects;
 
 @Component("premiumUserDiscountStrategy")
 public class PremiumUserDiscountStrategy implements DiscountStrategy {
@@ -19,11 +20,15 @@ public class PremiumUserDiscountStrategy implements DiscountStrategy {
 
 	@Override
 	public BigDecimal calculateDiscount(BigDecimal orderTotal) {
-		return orderTotal.multiply(PREMIUM_DISCOUNT_RATE).setScale(2, RoundingMode.HALF_UP);
+		Objects.requireNonNull(orderTotal, "orderTotal must not be null");
+
+		return orderTotal
+				.multiply(PREMIUM_DISCOUNT_RATE)
+				.setScale(2, RoundingMode.HALF_UP);
 	}
 
 	@Override
 	public String getDescription() {
-		return "10% premium user discount";
+		return "10% discount for premium users";
 	}
 }

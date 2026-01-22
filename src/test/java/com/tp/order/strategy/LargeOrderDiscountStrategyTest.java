@@ -11,79 +11,70 @@ import com.tp.order.entity.UserRole;
 
 class LargeOrderDiscountStrategyTest {
 
-    private LargeOrderDiscountStrategy strategy;
+	private LargeOrderDiscountStrategy strategy;
 
-    @BeforeEach
-    void setUp() {
-        strategy = new LargeOrderDiscountStrategy();
-    }
+	@BeforeEach
+	void setUp() {
+		strategy = new LargeOrderDiscountStrategy();
+	}
 
-    @Test
-    void isApplicable_shouldReturnTrue_whenOrderTotalIsAboveThreshold() {
-        BigDecimal orderTotal = new BigDecimal("500.00");
+	@Test
+	void shouldBeApplicableWhenOrderTotalIsGreaterThanThreshold() {
+		BigDecimal orderTotal = new BigDecimal("600.00");
 
-        boolean applicable = strategy.isApplicable(UserRole.USER, orderTotal);
+		boolean applicable = strategy.isApplicable(UserRole.USER, orderTotal);
 
-        assertTrue(applicable);
-    }
+		assertTrue(applicable);
+	}
 
-    @Test
-    void isApplicable_shouldReturnFalse_whenOrderTotalIsEqualToThreshold() {
-        BigDecimal orderTotal = new BigDecimal("500.00");
+	@Test
+	void shouldNotBeApplicableWhenOrderTotalIsEqualToThreshold() {
+		BigDecimal orderTotal = new BigDecimal("500.00");
 
-        boolean applicable = strategy.isApplicable(UserRole.USER, orderTotal);
+		boolean applicable = strategy.isApplicable(UserRole.USER, orderTotal);
 
-        assertFalse(applicable);
-    }
+		assertFalse(applicable);
+	}
 
-    @Test
-    void isApplicable_shouldReturnFalse_whenOrderTotalIsBelowThreshold() {
-        BigDecimal orderTotal = new BigDecimal("499.99");
+	@Test
+	void shouldNotBeApplicableWhenOrderTotalIsBelowThreshold() {
+		BigDecimal orderTotal = new BigDecimal("300.00");
 
-        boolean applicable = strategy.isApplicable(UserRole.USER, orderTotal);
+		boolean applicable = strategy.isApplicable(UserRole.USER, orderTotal);
 
-        assertFalse(applicable);
-    }
+		assertFalse(applicable);
+	}
 
-    @Test
-    void calculateDiscount_shouldReturnFivePercent_whenAboveThreshold() {
-        BigDecimal orderTotal = new BigDecimal("500.00");
+	@Test
+	void shouldNotBeApplicableWhenOrderTotalIsNull() {
+		boolean applicable = strategy.isApplicable(UserRole.USER, null);
 
-        BigDecimal discount = strategy.calculateDiscount(orderTotal);
+		assertFalse(applicable);
+	}
 
-        assertEquals(new BigDecimal("30.00"), discount);
-    }
+	@Test
+	void shouldCalculateCorrectDiscount() {
+		BigDecimal orderTotal = new BigDecimal("1000.00");
 
-    @Test
-    void calculateDiscount_shouldReturnZero_whenEqualToThreshold() {
-        BigDecimal orderTotal = new BigDecimal("500.00");
+		BigDecimal discount = strategy.calculateDiscount(orderTotal);
 
-        BigDecimal discount = strategy.calculateDiscount(orderTotal);
+		assertEquals(new BigDecimal("50.00"), discount);
+	}
 
-        assertEquals(BigDecimal.ZERO, discount);
-    }
+	@Test
+	void shouldCalculateDiscountWithCorrectRounding() {
+		BigDecimal orderTotal = new BigDecimal("999.99");
 
-    @Test
-    void calculateDiscount_shouldReturnZero_whenBelowThreshold() {
-        BigDecimal orderTotal = new BigDecimal("400.00");
+		BigDecimal discount = strategy.calculateDiscount(orderTotal);
 
-        BigDecimal discount = strategy.calculateDiscount(orderTotal);
+		assertEquals(new BigDecimal("50.00"), discount); // 49.9995 → 50.00
+	}
 
-        assertEquals(BigDecimal.ZERO, discount);
-    }
-
-    @Test
-    void calculateDiscount_shouldRoundToTwoDecimalPlaces() {
-        BigDecimal orderTotal = new BigDecimal("555.55");
-
-        BigDecimal discount = strategy.calculateDiscount(orderTotal);
-
-        // 555.55 * 0.05 = 27.7775 → 27.78
-        assertEquals(new BigDecimal("27.78"), discount);
-    }
-
-    @Test
-    void getDescription_shouldReturnCorrectDescription() {
-        assertEquals("5% discount for orders above $500", strategy.getDescription());
-    }
+	@Test
+	void shouldReturnCorrectDescription() {
+		assertEquals(
+				"5% discount for orders above $500",
+				strategy.getDescription()
+		);
+	}
 }
